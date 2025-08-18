@@ -50,7 +50,9 @@ class _MapScreenState extends State<MapScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Location permission permanently denied. Enable it in settings.'),
+              content: Text(
+                'Location permission permanently denied. Enable it in settings.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -91,28 +93,36 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Set<Marker> _buildMarkers(List<Item> items) {
-    return items.where((item) {
-      // Only show items that have valid coordinates
-      return item.latitude != 0.0 && item.longitude != 0.0;
-    }).map((item) {
-      return Marker(
-        markerId: MarkerId(item.id),
-        position: LatLng(item.latitude, item.longitude),
-        infoWindow: InfoWindow(
-          title: item.title,
-          snippet: '${item.type == 'found' ? 'Found' : 'Lost'} • ${item.location}',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => ItemDetailsScreen(item: item)),
-            );
-          },
-        ),
-        icon: BitmapDescriptor.defaultMarkerWithHue(
-          item.type == 'found' ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
-        ),
-      );
-    }).toSet();
+    return items
+        .where((item) {
+          // Only show items that have valid coordinates
+          return item.latitude != 0.0 && item.longitude != 0.0;
+        })
+        .map((item) {
+          return Marker(
+            markerId: MarkerId(item.id),
+            position: LatLng(item.latitude, item.longitude),
+            infoWindow: InfoWindow(
+              title: item.title,
+              snippet:
+                  '${item.type == 'found' ? 'Found' : 'Lost'} • ${item.location}',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ItemDetailsScreen(item: item),
+                  ),
+                );
+              },
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              item.type == 'found'
+                  ? BitmapDescriptor.hueGreen
+                  : BitmapDescriptor.hueRed,
+            ),
+          );
+        })
+        .toSet();
   }
 
   void _goToCurrentLocation() {
@@ -139,7 +149,10 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     final defaultLocation = _currentPosition != null
         ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
-        : const LatLng(37.4275, -122.1697); // Default to a location (Mountain View, CA)
+        : const LatLng(
+            37.4275,
+            -122.1697,
+          ); // Default to a location (Mountain View, CA)
 
     return Scaffold(
       appBar: AppBar(
@@ -172,11 +185,7 @@ class _MapScreenState extends State<MapScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    color: Colors.red,
-                    size: 64,
-                  ),
+                  Icon(Icons.error_outline, color: Colors.red, size: 64),
                   const SizedBox(height: 16),
                   Text(
                     'Error loading items',
@@ -201,8 +210,9 @@ class _MapScreenState extends State<MapScreen> {
           }
 
           final items = snapshot.data ?? [];
-          final itemsWithLocation = items.where((item) => 
-            item.latitude != 0.0 && item.longitude != 0.0).toList();
+          final itemsWithLocation = items
+              .where((item) => item.latitude != 0.0 && item.longitude != 0.0)
+              .toList();
 
           return Stack(
             children: [
@@ -217,7 +227,10 @@ class _MapScreenState extends State<MapScreen> {
                   if (_currentPosition != null) {
                     controller.animateCamera(
                       CameraUpdate.newLatLngZoom(
-                        LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                        LatLng(
+                          _currentPosition!.latitude,
+                          _currentPosition!.longitude,
+                        ),
                         16,
                       ),
                     );
@@ -229,14 +242,17 @@ class _MapScreenState extends State<MapScreen> {
                 mapToolbarEnabled: false,
                 compassEnabled: true,
               ),
-              
+
               // Items counter
               if (snapshot.connectionState != ConnectionState.waiting)
                 Positioned(
                   top: 16,
                   left: 16,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.9),
                       borderRadius: BorderRadius.circular(20),
@@ -251,11 +267,7 @@ class _MapScreenState extends State<MapScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.location_on,
-                          color: Colors.blue,
-                          size: 16,
-                        ),
+                        Icon(Icons.location_on, color: Colors.blue, size: 16),
                         const SizedBox(width: 4),
                         Text(
                           '${itemsWithLocation.length} items on map',
@@ -278,15 +290,14 @@ class _MapScreenState extends State<MapScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                         SizedBox(height: 16),
                         Text(
                           'Loading items...',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                          ),
+                          style: TextStyle(color: Colors.white, fontSize: 16),
                         ),
                       ],
                     ),
@@ -303,11 +314,15 @@ class _MapScreenState extends State<MapScreen> {
                       FloatingActionButton.small(
                         heroTag: 'lost',
                         onPressed: () {
-                          final lostItems = items.where((item) => 
-                            item.type == 'lost' && 
-                            item.latitude != 0.0 && 
-                            item.longitude != 0.0).toList();
-                          
+                          final lostItems = items
+                              .where(
+                                (item) =>
+                                    item.type == 'lost' &&
+                                    item.latitude != 0.0 &&
+                                    item.longitude != 0.0,
+                              )
+                              .toList();
+
                           if (lostItems.isNotEmpty) {
                             // Fit all lost items in view
                             final bounds = _calculateBounds(lostItems);
@@ -317,18 +332,25 @@ class _MapScreenState extends State<MapScreen> {
                           }
                         },
                         backgroundColor: Colors.red,
-                        child: const Icon(Icons.help_outline, color: Colors.white),
+                        child: const Icon(
+                          Icons.help_outline,
+                          color: Colors.white,
+                        ),
                         tooltip: 'Show Lost Items',
                       ),
                       const SizedBox(height: 8),
                       FloatingActionButton.small(
                         heroTag: 'found',
                         onPressed: () {
-                          final foundItems = items.where((item) => 
-                            item.type == 'found' && 
-                            item.latitude != 0.0 && 
-                            item.longitude != 0.0).toList();
-                          
+                          final foundItems = items
+                              .where(
+                                (item) =>
+                                    item.type == 'found' &&
+                                    item.latitude != 0.0 &&
+                                    item.longitude != 0.0,
+                              )
+                              .toList();
+
                           if (foundItems.isNotEmpty) {
                             // Fit all found items in view
                             final bounds = _calculateBounds(foundItems);
@@ -338,7 +360,10 @@ class _MapScreenState extends State<MapScreen> {
                           }
                         },
                         backgroundColor: Colors.green,
-                        child: const Icon(Icons.check_circle_outline, color: Colors.white),
+                        child: const Icon(
+                          Icons.check_circle_outline,
+                          color: Colors.white,
+                        ),
                         tooltip: 'Show Found Items',
                       ),
                     ],

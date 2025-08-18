@@ -1,11 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 
 class FirebaseAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Initialize Firebase if not already initialized
   Future<void> _ensureInitialized() async {
@@ -31,7 +33,12 @@ class FirebaseAuthService {
     required String name,
     required String phone,
   }) async {
+    await _ensureInitialized();
+
     try {
+      // Add a small delay to ensure Firebase is ready
+      await Future.delayed(const Duration(milliseconds: 100));
+
       // Create user with Firebase Auth
       UserCredential userCredential = await _auth
           .createUserWithEmailAndPassword(email: email, password: password);
@@ -53,11 +60,14 @@ class FirebaseAuthService {
       throw Exception(_getAuthException(e));
     } catch (e) {
       // Handle the specific Pigeon casting error and other unexpected errors
-      if (e.toString().contains('PigeonUserDetails') || 
-          e.toString().contains('List<Object?>')) {
-        throw Exception('Authentication service error. Please try again.');
+      if (e.toString().contains('PigeonUserDetails') ||
+          e.toString().contains('List<Object?>') ||
+          e.toString().contains('type cast')) {
+        throw Exception(
+          'Authentication service error. Please restart the app and try again.',
+        );
       }
-      throw Exception('An unexpected error occurred: ${e.toString()}');
+      throw Exception('Sign up failed: ${e.toString()}');
     }
   }
 
@@ -66,30 +76,131 @@ class FirebaseAuthService {
     required String email,
     required String password,
   }) async {
+    await _ensureInitialized();
+
     try {
+      print('🔐 Attempting to sign in with email: $email'); // Debug log
+
+      // Add a small delay to ensure Firebase is ready
+      await Future.delayed(const Duration(milliseconds: 100));
+
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      print(
+        '✅ Sign in successful for user: ${userCredential.user?.email}',
+      ); // Debug log
       return userCredential;
     } on FirebaseAuthException catch (e) {
+      print('🔥 FirebaseAuthException: ${e.code} - ${e.message}'); // Debug log
       throw Exception(_getAuthException(e));
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('❌ Unexpected error during sign in: $e'); // Debug log
+      print('📍 Stack trace: $stackTrace'); // Debug log
+
       // Handle the specific Pigeon casting error and other unexpected errors
-      if (e.toString().contains('PigeonUserDetails') || 
-          e.toString().contains('List<Object?>')) {
-        throw Exception('Authentication service error. Please try again.');
+      if (e.toString().contains('PigeonUserDetails') ||
+          e.toString().contains('List<Object?>') ||
+          e.toString().contains('type cast')) {
+        throw Exception(
+          'Authentication service error. Please restart the app and try again.',
+        );
       }
-      throw Exception('An unexpected error occurred: ${e.toString()}');
+      throw Exception('Sign in failed: ${e.toString()}');
     }
   }
 
   // Sign out
   Future<void> signOut() async {
     try {
-      await _auth.signOut();
+      await Future.wait([_auth.signOut(), _googleSignIn.signOut()]);
     } catch (e) {
       throw Exception('Failed to sign out: $e');
+    }
+  }
+
+  // Sign in with Google
+  Future<UserCredential?> signInWithGoogle() async {
+    await _ensureInitialized();
+
+    try {
+      print('🔐 Attempting Google Sign-In'); // Debug log
+
+      // Trigger the authentication flow
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        print('❌ Google Sign-In cancelled by user'); // Debug log
+        return null;
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase with the Google credential
+      UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
+
+      // Create or update user document in Firestore
+      if (userCredential.user != null) {
+        await _createOrUpdateGoogleUserDocument(userCredential.user!);
+      }
+
+      print(
+        '✅ Google Sign-In successful for user: ${userCredential.user?.email}',
+      ); // Debug log
+      return userCredential;
+    } catch (e, stackTrace) {
+      print('❌ Google Sign-In error: $e'); // Debug log
+      print('📍 Stack trace: $stackTrace'); // Debug log
+      throw Exception('Google Sign-In failed: ${e.toString()}');
+    }
+  }
+
+  // Create or update user document for Google sign-in
+  Future<void> _createOrUpdateGoogleUserDocument(User user) async {
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+
+      if (!userDoc.exists) {
+        // Create new user document
+        final userModel = UserModel(
+          id: user.uid,
+          name: user.displayName ?? 'Google User',
+          email: user.email ?? '',
+          phone: '', // Google sign-in doesn't provide phone by default
+          avatarUrl: user.photoURL,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          isVerified: user.emailVerified,
+          role: 'user',
+        );
+
+        await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .set(userModel.toMap());
+      } else {
+        // Update existing user document
+        await _firestore.collection('users').doc(user.uid).update({
+          'avatarUrl': user.photoURL,
+          'isVerified': user.emailVerified,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      throw Exception('Failed to create/update user document: $e');
     }
   }
 
@@ -226,6 +337,43 @@ class FirebaseAuthService {
       await currentUser?.reload();
     } catch (e) {
       throw Exception('Failed to reload user: $e');
+    }
+  }
+
+  // Update password
+  Future<void> updatePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    try {
+      final user = currentUser;
+      if (user == null) {
+        throw Exception('No user currently signed in');
+      }
+
+      // Re-authenticate the user with current password
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+
+      // Update password
+      await user.updatePassword(newPassword);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password') {
+        throw Exception('Current password is incorrect');
+      } else if (e.code == 'weak-password') {
+        throw Exception('New password is too weak');
+      } else if (e.code == 'requires-recent-login') {
+        throw Exception(
+          'Please sign out and sign in again before updating password',
+        );
+      }
+      throw Exception(_getAuthException(e));
+    } catch (e) {
+      throw Exception('Failed to update password: $e');
     }
   }
 

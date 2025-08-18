@@ -4,9 +4,6 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
 /// Example:
@@ -94,5 +91,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'findit-2b296.firebasestorage.app',
     measurementId: 'G-76DNR1XRDN',
   );
-
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/firebase_auth_service.dart';
+import '../../utils/error_handler.dart';
 import 'login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -61,9 +62,24 @@ class _SignupScreenState extends State<SignupScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-        );
+        AuthErrorHandler.showErrorSnackBar(context, e);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _signUpWithGoogle() async {
+    setState(() => _isLoading = true);
+
+    try {
+      await _authService.signInWithGoogle();
+      // Navigation is handled automatically by AuthWrapper
+    } catch (e) {
+      if (mounted) {
+        AuthErrorHandler.showErrorSnackBar(context, e);
       }
     } finally {
       if (mounted) {
@@ -470,6 +486,77 @@ class _SignupScreenState extends State<SignupScreen> {
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // OR Divider
+                          Row(
+                            children: [
+                              const Expanded(child: Divider()),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                child: Text(
+                                  'OR',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              const Expanded(child: Divider()),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Google Sign-Up Button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: OutlinedButton.icon(
+                              onPressed: _isLoading ? null : _signUpWithGoogle,
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: Colors.grey.shade300),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                backgroundColor: Colors.white,
+                              ),
+                              icon: _isLoading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.grey,
+                                            ),
+                                      ),
+                                    )
+                                  : Image.asset(
+                                      'assets/images/google_logo.png',
+                                      height: 24,
+                                      width: 24,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return Icon(
+                                              Icons.account_circle,
+                                              color: Colors.grey.shade600,
+                                              size: 24,
+                                            );
+                                          },
+                                    ),
+                              label: Text(
+                                'Continue with Google',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
                             ),
                           ),
                         ],
