@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:io';
 import '../providers/user_provider.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -13,7 +17,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _imagePicker = ImagePicker();
   bool _isLoading = false;
+  File? _selectedImage;
+  String? _uploadedImageUrl;
 
   @override
   void initState() {
@@ -25,6 +32,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final userProvider = context.read<UserProvider>();
     _nameController.text = userProvider.displayName;
     _phoneController.text = userProvider.phone;
+    _uploadedImageUrl = userProvider.avatarUrl;
   }
 
   @override
@@ -34,16 +42,106 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
+  Future<void> _selectImage() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Photo Library'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Camera'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 70,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to select image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<String?> _uploadImage() async {
+    if (_selectedImage == null) return null;
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return null;
+
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_images')
+          .child('${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+      final uploadTask = storageRef.putFile(_selectedImage!);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+
+      return downloadUrl;
+    } catch (e) {
+      print('Error uploading image: $e');
+      return null;
+    }
+  }
+
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
+      String? imageUrl = _uploadedImageUrl;
+      
+      // Upload new image if selected
+      if (_selectedImage != null) {
+        final uploadedUrl = await _uploadImage();
+        if (uploadedUrl != null) {
+          imageUrl = uploadedUrl;
+        }
+      }
+
       final userProvider = context.read<UserProvider>();
       final success = await userProvider.updateProfile(
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
+        avatarUrl: imageUrl,
       );
 
       if (success && mounted) {
@@ -96,40 +194,57 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   // Profile Avatar Section
                   Center(
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.grey.shade200,
-                            image: DecorationImage(
-                              image: NetworkImage(
-                                context.watch<UserProvider>().avatarUrl ??
-                                    'https://randomuser.me/api/portraits/lego/1.jpg',
-                              ),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(
-                              color: Colors.blue,
+                    child: GestureDetector(
+                      onTap: _selectImage,
+                      child: Stack(
+                        children: [
+                          Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
+                              color: Colors.grey.shade200,
+                              image: _selectedImage != null
+                                  ? DecorationImage(
+                                      image: FileImage(_selectedImage!),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : (context.watch<UserProvider>().avatarUrl != null
+                                      ? DecorationImage(
+                                          image: NetworkImage(
+                                            context.watch<UserProvider>().avatarUrl!,
+                                          ),
+                                          fit: BoxFit.cover,
+                                        )
+                                      : null),
                             ),
-                            child: const Icon(
-                              Icons.camera_alt,
-                              color: Colors.white,
-                              size: 20,
+                            child: _selectedImage == null && 
+                                   context.watch<UserProvider>().avatarUrl == null
+                                ? Icon(
+                                    Icons.person,
+                                    size: 60,
+                                    color: Colors.grey.shade400,
+                                  )
+                                : null,
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: Colors.blue,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 32),

@@ -307,7 +307,7 @@ class FirebaseAuthService {
         await user.updateDisplayName(name);
       }
 
-      // Update Firestore document
+      // Update Firestore document using set with merge to handle non-existent documents
       Map<String, dynamic> updates = {
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -316,8 +316,15 @@ class FirebaseAuthService {
       if (phone != null) updates['phone'] = phone;
       if (avatarUrl != null) updates['avatarUrl'] = avatarUrl;
 
-      await _firestore.collection('users').doc(user.uid).update(updates);
+      // Use set with merge instead of update to handle cases where document doesn't exist
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .set(updates, SetOptions(merge: true));
+      
+      print('Profile updated successfully in Firestore');
     } catch (e) {
+      print('Error updating profile: $e');
       throw Exception('Failed to update profile: $e');
     }
   }
