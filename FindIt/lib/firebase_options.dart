@@ -4,6 +4,9 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
 /// Example:
@@ -14,6 +17,12 @@ import 'package:flutter/foundation.dart'
 ///   options: DefaultFirebaseOptions.currentPlatform,
 /// );
 /// ```
+
+///*  edited
+// await Firebase.initializeApp(
+//     options: DefaultFirebaseOptions.currentPlatform,
+// );
+
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -41,48 +50,49 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'your-web-api-key',
-    appId: 'your-web-app-id',
-    messagingSenderId: 'your-sender-id',
-    projectId: 'your-project-id',
-    authDomain: 'your-project-id.firebaseapp.com',
-    storageBucket: 'your-project-id.appspot.com',
-    measurementId: 'your-measurement-id',
+    apiKey: 'AIzaSyCA6nLTZ8YifrPfpDFIO34BINxtL29wxJw',
+    appId: '1:114286790353:web:595c1ae682dba160d467f0',
+    messagingSenderId: '114286790353',
+    projectId: 'findit-2b296',
+    authDomain: 'findit-2b296.firebaseapp.com',
+    storageBucket: 'findit-2b296.firebasestorage.app',
+    measurementId: 'G-WQS1L2QK5P',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'your-android-api-key',
-    appId: 'your-android-app-id',
-    messagingSenderId: 'your-sender-id',
-    projectId: 'your-project-id',
-    storageBucket: 'your-project-id.appspot.com',
+    apiKey: 'AIzaSyCV1a95V-Yc3eNvE_dnwVelhuAEQNO3OKA',
+    appId: '1:114286790353:android:be58869b07a4dddbd467f0',
+    messagingSenderId: '114286790353',
+    projectId: 'findit-2b296',
+    storageBucket: 'findit-2b296.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'your-ios-api-key',
-    appId: 'your-ios-app-id',
-    messagingSenderId: 'your-sender-id',
-    projectId: 'your-project-id',
-    storageBucket: 'your-project-id.appspot.com',
-    iosClientId: 'your-ios-client-id',
+    apiKey: 'AIzaSyDPqJFTf9Hl_GVDSINg6U7qU4rMCFzgCdg',
+    appId: '1:114286790353:ios:920c3f116073584ad467f0',
+    messagingSenderId: '114286790353',
+    projectId: 'findit-2b296',
+    storageBucket: 'findit-2b296.firebasestorage.app',
     iosBundleId: 'com.example.findit',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'your-macos-api-key',
-    appId: 'your-macos-app-id',
-    messagingSenderId: 'your-sender-id',
-    projectId: 'your-project-id',
-    storageBucket: 'your-project-id.appspot.com',
-    iosClientId: 'your-macos-client-id',
+    apiKey: 'AIzaSyDPqJFTf9Hl_GVDSINg6U7qU4rMCFzgCdg',
+    appId: '1:114286790353:ios:920c3f116073584ad467f0',
+    messagingSenderId: '114286790353',
+    projectId: 'findit-2b296',
+    storageBucket: 'findit-2b296.firebasestorage.app',
     iosBundleId: 'com.example.findit',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'your-windows-api-key',
-    appId: 'your-windows-app-id',
-    messagingSenderId: 'your-sender-id',
-    projectId: 'your-project-id',
-    storageBucket: 'your-project-id.appspot.com',
+    apiKey: 'AIzaSyCA6nLTZ8YifrPfpDFIO34BINxtL29wxJw',
+    appId: '1:114286790353:web:1064d2f814a0f687d467f0',
+    messagingSenderId: '114286790353',
+    projectId: 'findit-2b296',
+    authDomain: 'findit-2b296.firebaseapp.com',
+    storageBucket: 'findit-2b296.firebasestorage.app',
+    measurementId: 'G-76DNR1XRDN',
   );
+
 }
