@@ -162,8 +162,8 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
         tooltip: 'Post Item',
+        child: const Icon(Icons.add),
       ),
       body: Column(
         children: [
