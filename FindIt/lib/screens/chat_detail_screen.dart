@@ -12,7 +12,7 @@ class ChatDetailScreen extends StatefulWidget {
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
   final List<Map<String, dynamic>> _messages = [];
-  bool _isLoading = false;
+  final bool _isLoading = false;
 
   @override
   void initState() {
@@ -105,7 +105,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     style: const TextStyle(fontSize: 16),
                   ),
                   Text(
-                    '${widget.conversation['unreadCount'] > 0 ? 'Online' : 'Offline'}',
+                    widget.conversation['unreadCount'] > 0 ? 'Online' : 'Offline',
                     style: TextStyle(
                       fontSize: 12,
                       color: widget.conversation['unreadCount'] > 0

@@ -332,11 +332,11 @@ class _MapScreenState extends State<MapScreen> {
                           }
                         },
                         backgroundColor: Colors.red,
+                        tooltip: 'Show Lost Items',
                         child: const Icon(
                           Icons.help_outline,
                           color: Colors.white,
                         ),
-                        tooltip: 'Show Lost Items',
                       ),
                       const SizedBox(height: 8),
                       FloatingActionButton.small(
@@ -360,11 +360,11 @@ class _MapScreenState extends State<MapScreen> {
                           }
                         },
                         backgroundColor: Colors.green,
+                        tooltip: 'Show Found Items',
                         child: const Icon(
                           Icons.check_circle_outline,
                           color: Colors.white,
                         ),
-                        tooltip: 'Show Found Items',
                       ),
                     ],
                   ),
@@ -376,8 +376,8 @@ class _MapScreenState extends State<MapScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _addNewItem,
         backgroundColor: Colors.blue,
-        child: const Icon(Icons.add, color: Colors.white),
         tooltip: 'Add Item',
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

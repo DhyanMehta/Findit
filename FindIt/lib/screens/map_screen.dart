@@ -376,8 +376,8 @@ class _MapScreenState extends State<MapScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: _addNewItem,
         backgroundColor: Colors.blue,
-        child: const Icon(Icons.add, color: Colors.white),
         tooltip: 'Add Item',
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
