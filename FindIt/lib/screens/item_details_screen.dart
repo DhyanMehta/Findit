@@ -1,0 +1,410 @@
+import 'package:flutter/material.dart';
+import '../models/item.dart';
+
+class ItemDetailsScreen extends StatefulWidget {
+  final Item item;
+
+  const ItemDetailsScreen({super.key, required this.item});
+
+  @override
+  State<ItemDetailsScreen> createState() => _ItemDetailsScreenState();
+}
+
+class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
+  bool _isContacting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Item Details'),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share),
+            onPressed: _shareItem,
+            tooltip: 'Share item',
+          ),
+        ],
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.blue.shade50, Colors.white],
+          ),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Item Image
+              Container(
+                height: 300,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                  image: DecorationImage(
+                    image: NetworkImage(widget.item.imageUrl),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    // Status Badge
+                    Positioned(
+                      top: 16,
+                      right: 16,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: widget.item.isFound
+                              ? Colors.green
+                              : Colors.red,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              widget.item.isFound
+                                  ? Icons.check_circle
+                                  : Icons.cancel,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              widget.item.isFound ? 'Found' : 'Lost',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title and Category
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.item.title,
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey.shade800,
+                                ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            widget.item.category,
+                            style: TextStyle(
+                              color: Colors.blue.shade800,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Description
+                    _buildDetailSection(
+                      icon: Icons.description,
+                      title: 'Description',
+                      content: widget.item.description,
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Location
+                    _buildDetailSection(
+                      icon: Icons.place,
+                      title: 'Location',
+                      content: widget.item.location,
+                      showMap: true,
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Date and Time
+                    _buildDetailSection(
+                      icon: Icons.access_time,
+                      title: 'Date & Time',
+                      content: _formatDateTime(widget.item.dateTime),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Contact Method
+                    _buildDetailSection(
+                      icon: Icons.contact_mail,
+                      title: 'Contact Method',
+                      content: widget.item.contactMethod,
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Contact Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton.icon(
+                        onPressed: _isContacting ? null : _contactOwner,
+                        icon: _isContacting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Icon(Icons.message),
+                        label: Text(
+                          _isContacting
+                              ? 'Contacting...'
+                              : 'Contact ${widget.item.isFound ? 'Finder' : 'Owner'}',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Additional Actions
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _reportItem,
+                            icon: const Icon(Icons.report),
+                            label: const Text('Report'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _saveItem,
+                            icon: const Icon(Icons.bookmark_border),
+                            label: const Text('Save'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailSection({
+    required IconData icon,
+    required String title,
+    required String content,
+    bool showMap = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: Colors.blue.shade700, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            content,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.shade700,
+              height: 1.5,
+            ),
+          ),
+          if (showMap) ...[
+            const SizedBox(height: 16),
+            Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.map, size: 32, color: Colors.grey.shade600),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Location: ${widget.item.latitude.toStringAsFixed(4)}, ${widget.item.longitude.toStringAsFixed(4)}',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    String timeAgo;
+    if (difference.inDays > 0) {
+      timeAgo = '${difference.inDays} days ago';
+    } else if (difference.inHours > 0) {
+      timeAgo = '${difference.inHours} hours ago';
+    } else if (difference.inMinutes > 0) {
+      timeAgo = '${difference.inMinutes} minutes ago';
+    } else {
+      timeAgo = 'Just now';
+    }
+
+    return '${dateTime.toLocal().toString().split('.')[0]}\n($timeAgo)';
+  }
+
+  Future<void> _contactOwner() async {
+    setState(() => _isContacting = true);
+
+    try {
+      // Simulate network delay
+      await Future.delayed(const Duration(seconds: 1));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Opening chat with ${widget.item.isFound ? 'finder' : 'owner'}...',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isContacting = false);
+      }
+    }
+  }
+
+  void _shareItem() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sharing item...'),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
+
+  void _reportItem() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Reporting item...'),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  }
+
+  void _saveItem() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Item saved to favorites'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+}
