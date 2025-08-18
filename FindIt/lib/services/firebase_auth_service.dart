@@ -243,16 +243,22 @@ class FirebaseAuthService {
   // Get user document from Firestore
   Future<UserModel?> getUserDocument(String uid) async {
     try {
+      print('Attempting to get user document for UID: $uid'); // Debug log
       DocumentSnapshot doc = await _firestore
           .collection('users')
           .doc(uid)
           .get();
 
       if (doc.exists) {
-        return UserModel.fromMap(doc.data() as Map<String, dynamic>);
+        print('User document found for UID: $uid'); // Debug log
+        final data = doc.data() as Map<String, dynamic>;
+        return UserModel.fromMap(data);
+      } else {
+        print('User document does not exist for UID: $uid'); // Debug log
+        return null;
       }
-      return null;
     } catch (e) {
+      print('Error getting user document for UID $uid: $e'); // Debug log
       throw Exception('Failed to get user document: $e');
     }
   }
@@ -268,6 +274,21 @@ class FirebaseAuthService {
           );
     } catch (e) {
       throw Exception('Failed to update user document: $e');
+    }
+  }
+
+  // Create or update user document (uses set with merge)
+  Future<void> createOrUpdateUserDocument(UserModel userModel) async {
+    try {
+      final docData = userModel.toMap();
+      docData['updatedAt'] = FieldValue.serverTimestamp();
+
+      await _firestore
+          .collection('users')
+          .doc(userModel.id)
+          .set(docData, SetOptions(merge: true));
+    } catch (e) {
+      throw Exception('Failed to create/update user document: $e');
     }
   }
 

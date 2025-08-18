@@ -5,6 +5,7 @@ import '../models/user_model.dart';
 import '../models/item.dart';
 import '../utils/error_handler.dart';
 import 'edit_profile_screen.dart';
+import 'change_password_screen.dart';
 import 'item_details_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -33,20 +34,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final currentUser = _authService.currentUser;
       if (currentUser != null) {
-        final userModel = await _authService.getUserDocument(currentUser.uid);
+        print('Loading user data for: ${currentUser.uid}'); // Debug log
+
+        // Try to get existing user document
+        UserModel? userModel = await _authService.getUserDocument(
+          currentUser.uid,
+        );
+
+        // If user document doesn't exist, create it
+        if (userModel == null) {
+          print('User document not found, creating new one...'); // Debug log
+          await _createUserDocumentFromCurrentUser(currentUser);
+          // Try to get the document again after creating it
+          userModel = await _authService.getUserDocument(currentUser.uid);
+        }
+
         setState(() {
           _userData = userModel;
           _isLoadingProfile = false;
         });
+      } else {
+        print('No current user found'); // Debug log
+        setState(() => _isLoadingProfile = false);
       }
     } catch (e) {
+      print('Error loading user data: $e'); // Debug log
       setState(() => _isLoadingProfile = false);
       if (mounted) {
-        AuthErrorHandler.showErrorSnackBar(context, e);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading profile: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
 
+  // Create user document from current Firebase Auth user
+  Future<void> _createUserDocumentFromCurrentUser(dynamic currentUser) async {
+    try {
+      print('Creating user document for: ${currentUser.uid}'); // Debug log
+
+      final userModel = UserModel(
+        id: currentUser.uid,
+        name:
+            currentUser.displayName ??
+            currentUser.email?.split('@')[0] ??
+            'User',
+        email: currentUser.email ?? '',
+        phone: currentUser.phoneNumber ?? '',
+        avatarUrl: currentUser.photoURL,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        isVerified: currentUser.emailVerified ?? false,
+        role: 'user',
+      );
+
+      // Use the Firebase service to create the document
+      await _authService.createOrUpdateUserDocument(userModel);
+      print('User document created successfully'); // Debug log
+    } catch (e) {
+      print('Error creating user document: $e'); // Debug log
+      throw Exception('Failed to create user profile: $e');
+    }
+  }
+
+  // Retry loading user data
   Future<void> _signOut() async {
     setState(() => _isLoading = true);
 
@@ -76,132 +130,113 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _changePassword() {
-    _showChangePasswordDialog();
-  }
-
-  void _showChangePasswordDialog() {
-    final currentPasswordController = TextEditingController();
-    final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
-    bool isUpdating = false;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Change Password'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: currentPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Current Password',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: newPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'New Password',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: confirmPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Confirm New Password',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: isUpdating ? null : () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: isUpdating
-                  ? null
-                  : () async {
-                      if (newPasswordController.text !=
-                          confirmPasswordController.text) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Passwords do not match'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
-
-                      if (newPasswordController.text.length < 6) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Password must be at least 6 characters',
-                            ),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
-
-                      setState(() => isUpdating = true);
-
-                      try {
-                        await _authService.updatePassword(
-                          currentPasswordController.text,
-                          newPasswordController.text,
-                        );
-
-                        if (mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Password updated successfully!'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          AuthErrorHandler.showErrorSnackBar(context, e);
-                        }
-                      } finally {
-                        setState(() => isUpdating = false);
-                      }
-                    },
-              child: isUpdating
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Update'),
-            ),
-          ],
-        ),
-      ),
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const ChangePasswordScreen()),
     );
   }
 
   void _privacySettings() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Privacy settings feature coming soon!')),
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Privacy Settings'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SwitchListTile(
+              title: const Text('Profile Visibility'),
+              subtitle: const Text('Show your profile to other users'),
+              value: true,
+              onChanged: (value) {
+                // TODO: Implement profile visibility toggle
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Feature coming soon!')),
+                );
+              },
+            ),
+            SwitchListTile(
+              title: const Text('Location Sharing'),
+              subtitle: const Text('Share location data with posts'),
+              value: true,
+              onChanged: (value) {
+                // TODO: Implement location sharing toggle
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Feature coming soon!')),
+                );
+              },
+            ),
+            SwitchListTile(
+              title: const Text('Activity Status'),
+              subtitle: const Text('Show when you were last active'),
+              value: false,
+              onChanged: (value) {
+                // TODO: Implement activity status toggle
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Feature coming soon!')),
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 
   void _notifications() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Notification settings feature coming soon!'),
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Notification Settings'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SwitchListTile(
+              title: const Text('Push Notifications'),
+              subtitle: const Text('Receive notifications for new matches'),
+              value: true,
+              onChanged: (value) {
+                // TODO: Implement push notifications toggle
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Feature coming soon!')),
+                );
+              },
+            ),
+            SwitchListTile(
+              title: const Text('Email Notifications'),
+              subtitle: const Text('Get updates via email'),
+              value: false,
+              onChanged: (value) {
+                // TODO: Implement email notifications toggle
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Feature coming soon!')),
+                );
+              },
+            ),
+            SwitchListTile(
+              title: const Text('Chat Messages'),
+              subtitle: const Text('Get notified about new messages'),
+              value: true,
+              onChanged: (value) {
+                // TODO: Implement chat notification toggle
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Feature coming soon!')),
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }

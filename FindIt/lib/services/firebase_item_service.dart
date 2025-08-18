@@ -8,7 +8,6 @@ class FirebaseItemService {
 
   // Collection references
   CollectionReference get _itemsCollection => _firestore.collection('items');
-  CollectionReference get _chatsCollection => _firestore.collection('chats');
 
   // Get current user ID
   String? get _currentUserId => _auth.currentUser?.uid;
@@ -34,16 +33,22 @@ class FirebaseItemService {
 
   // Get all items (for home screen)
   Stream<List<Item>> getAllItems() {
-    return _itemsCollection
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            data['id'] = doc.id;
-            return Item.fromMap(data);
-          }).toList();
-        });
+    try {
+      return _itemsCollection.snapshots().map((snapshot) {
+        final items = snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          data['id'] = doc.id;
+          return Item.fromMap(data);
+        }).toList();
+
+        // Sort in memory to avoid index requirement
+        items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return items;
+      });
+    } catch (e) {
+      print('Error getting all items: $e');
+      return Stream.value([]);
+    }
   }
 
   // Get user's items

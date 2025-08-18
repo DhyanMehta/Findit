@@ -85,6 +85,25 @@ class UserProvider with ChangeNotifier {
     }
   }
 
+  // Change password
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      await _authService.updatePassword(currentPassword, newPassword);
+      return true;
+    } catch (e) {
+      _setError('Failed to change password: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // Reload user authentication data
   Future<void> reloadUser() async {
     try {
