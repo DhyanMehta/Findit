@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-// import 'package:firebase_core/firebase_core.dart'; // Commented out Firebase
-// import 'package:firebase_auth/firebase_auth.dart'; // Commented out Firebase
-// import 'firebase_options.dart'; // Commented out Firebase
-import 'services/static_auth_service.dart'; // Using static auth service
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'firebase_options.dart';
+import 'providers/user_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/post_item_screen.dart';
@@ -13,7 +14,7 @@ import 'screens/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform); // Commented out Firebase
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const FindItApp());
 }
 
@@ -22,19 +23,23 @@ class FindItApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'FindIt - Lost & Found',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          selectedItemColor: Colors.blue,
-          unselectedItemColor: Colors.grey,
-          showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
+    return MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => UserProvider())],
+      child: MaterialApp(
+        title: 'FindIt - Lost & Found',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+          useMaterial3: true,
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+            selectedItemColor: Colors.blue,
+            unselectedItemColor: Colors.grey,
+            showUnselectedLabels: true,
+            type: BottomNavigationBarType.fixed,
+          ),
         ),
+        home: const AuthWrapper(),
       ),
-      home: const AuthWrapper(),
     );
   }
 }
@@ -44,25 +49,29 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Using static auth service instead of Firebase
-    final currentUser = StaticAuthService.currentUser;
-    print(
-      'AuthWrapper: currentUser = ${currentUser != null ? currentUser['email'] : 'null'}',
-    ); // Debug print
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Check if we have data yet
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    if (currentUser != null) {
-      // User is signed in
-      print(
-        'AuthWrapper: User is signed in, returning MainNavigation',
-      ); // Debug print
-      return const MainNavigation();
-    }
+        // If user is signed in
+        if (snapshot.hasData) {
+          // Initialize user data when authenticated
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.read<UserProvider>().initializeUser();
+          });
+          return const MainNavigation();
+        }
 
-    // User is not signed in
-    print(
-      'AuthWrapper: User is not signed in, returning LoginScreen',
-    ); // Debug print
-    return const LoginScreen();
+        // User is not signed in
+        return const LoginScreen();
+      },
+    );
   }
 }
 

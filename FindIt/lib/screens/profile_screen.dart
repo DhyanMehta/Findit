@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-// import 'package:firebase_auth/firebase_auth.dart'; // Commented out Firebase
-// import '../services/firebase_service.dart'; // Commented out Firebase
-import '../services/static_auth_service.dart'; // Using static auth service
+import '../services/firebase_auth_service.dart';
+import '../models/user_model.dart';
 import '../models/item.dart';
-import '../screens/auth/login_screen.dart';
 import 'item_details_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -14,8 +12,9 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final _authService = FirebaseAuthService();
   bool _isLoading = false;
-  Map<String, dynamic>? _userData;
+  UserModel? _userData;
   List<Item> _userItems = [];
   bool _isLoadingProfile = true;
   bool _isLoadingItems = true;
@@ -31,13 +30,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoadingProfile = true);
 
     try {
-      final currentUser = StaticAuthService.currentUser;
+      final currentUser = _authService.currentUser;
       if (currentUser != null) {
-        final userProfile = await StaticAuthService.getUserProfile(
-          currentUser['id'],
-        );
+        final userModel = await _authService.getUserDocument(currentUser.uid);
         setState(() {
-          _userData = userProfile ?? currentUser;
+          _userData = userModel;
           _isLoadingProfile = false;
         });
       }
@@ -50,14 +47,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoadingItems = true);
 
     try {
-      final currentUser = StaticAuthService.currentUser;
-      if (currentUser != null) {
-        final items = await StaticAuthService.getUserItems(currentUser['id']);
-        setState(() {
-          _userItems = items;
-          _isLoadingItems = false;
-        });
-      }
+      // For now, we'll use empty list since we need to implement item management with Firestore
+      // You can implement getUserItems in FirebaseAuthService later
+      setState(() {
+        _userItems = [];
+        _isLoadingItems = false;
+      });
     } catch (e) {
       setState(() => _isLoadingItems = false);
     }
@@ -67,13 +62,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await StaticAuthService.signOut();
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false,
-        );
-      }
+      await _authService.signOut();
+      // Navigation is handled automatically by AuthWrapper
+      // No need to manually navigate
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -130,7 +121,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = StaticAuthService.currentUser;
+    final currentUser = _authService.currentUser;
     if (currentUser == null) {
       return const Scaffold(
         body: Center(child: Text('User not authenticated')),
@@ -202,12 +193,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileContent() {
-    final userName = _userData!['name'] ?? 'User';
-    final userEmail = _userData!['email'] ?? 'No email';
-    final userPhone = _userData!['phone'] ?? 'No phone';
-    final userRole = _userData!['role'] ?? 'user';
+    final userName = _userData!.name;
+    final userEmail = _userData!.email;
+    final userPhone = _userData!.phone;
+    final userRole = _userData!.role;
     final userAvatar =
-        _userData!['avatarUrl'] ??
+        _userData!.avatarUrl ??
         'https://randomuser.me/api/portraits/lego/1.jpg';
 
     return ListView(

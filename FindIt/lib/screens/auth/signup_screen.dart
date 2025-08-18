@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-// import 'package:firebase_auth/firebase_auth.dart'; // Commented out Firebase
-// import 'package:cloud_firestore/cloud_firestore.dart'; // Commented out Firebase
-import '../../services/static_auth_service.dart'; // Using static auth service
+import '../../services/firebase_auth_service.dart';
 import 'login_screen.dart';
-import '../../main.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -19,6 +16,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _authService = FirebaseAuthService();
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -39,39 +37,32 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Using static auth service instead of Firebase
-      final success = await StaticAuthService.signUp(
-        _nameController.text.trim(),
-        _emailController.text.trim(),
-        _phoneController.text.trim(),
-        _passwordController.text.trim(),
+      await _authService.signUpWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
       );
 
-      if (success && mounted) {
+      if (mounted) {
+        // Send email verification
+        await _authService.sendEmailVerification();
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Account created successfully!'),
+            content: Text(
+              'Account created! Please check your email for verification.',
+            ),
             backgroundColor: Colors.green,
           ),
         );
 
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainNavigation()),
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Email already exists. Please use a different email.',
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Navigation is handled automatically by AuthWrapper
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
         );
       }
     } finally {
