@@ -321,7 +321,7 @@ class FirebaseAuthService {
           .collection('users')
           .doc(user.uid)
           .set(updates, SetOptions(merge: true));
-      
+
       print('Profile updated successfully in Firestore');
     } catch (e) {
       print('Error updating profile: $e');

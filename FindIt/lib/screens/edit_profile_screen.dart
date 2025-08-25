@@ -128,7 +128,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       String? imageUrl = _uploadedImageUrl;
-      
+
       // Upload new image if selected
       if (_selectedImage != null) {
         final uploadedUrl = await _uploadImage();
@@ -209,17 +209,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                       image: FileImage(_selectedImage!),
                                       fit: BoxFit.cover,
                                     )
-                                  : (context.watch<UserProvider>().avatarUrl != null
-                                      ? DecorationImage(
-                                          image: NetworkImage(
-                                            context.watch<UserProvider>().avatarUrl!,
-                                          ),
-                                          fit: BoxFit.cover,
-                                        )
-                                      : null),
+                                  : (context.watch<UserProvider>().avatarUrl !=
+                                            null
+                                        ? DecorationImage(
+                                            image: NetworkImage(
+                                              context
+                                                  .watch<UserProvider>()
+                                                  .avatarUrl!,
+                                            ),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : null),
                             ),
-                            child: _selectedImage == null && 
-                                   context.watch<UserProvider>().avatarUrl == null
+                            child:
+                                _selectedImage == null &&
+                                    context.watch<UserProvider>().avatarUrl ==
+                                        null
                                 ? Icon(
                                     Icons.person,
                                     size: 60,
