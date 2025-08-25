@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'providers/user_provider.dart';
+import 'services/notification_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/post_item_screen.dart';
@@ -64,11 +65,15 @@ class AuthWrapper extends StatelessWidget {
           // Initialize user data when authenticated
           WidgetsBinding.instance.addPostFrameCallback((_) {
             context.read<UserProvider>().initializeUser();
+            NotificationService().start();
           });
           return const MainNavigation();
         }
 
         // User is not signed in
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          NotificationService().stop();
+        });
         return const LoginScreen();
       },
     );

@@ -102,7 +102,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final currentUserId = _authService.currentUser?.uid ?? '';
     final otherDisplayName = _shareProfile[_otherUserId] == true
         ? 'User' // Real name will show per message when shared
-        : (_aliases[_otherUserId] ?? 'User');
+        : (_aliases[_otherUserId] ?? 'Anonymous User');
     return Scaffold(
       appBar: AppBar(
         title: Row(

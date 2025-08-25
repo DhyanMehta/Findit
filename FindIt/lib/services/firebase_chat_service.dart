@@ -44,34 +44,40 @@ class Message {
 class Chat {
   final String id;
   final String itemId;
+  final String itemTitle;
   final List<String> participants;
   final String lastMessage;
   final DateTime lastMessageTime;
   final Map<String, bool> readStatus; // userId -> hasRead
   final Map<String, String> aliases; // userId -> alias (e.g., User A/B)
   final Map<String, bool> shareProfile; // userId -> has shared real profile
+  final String? lastSenderId;
 
   Chat({
     required this.id,
     required this.itemId,
+    required this.itemTitle,
     required this.participants,
     required this.lastMessage,
     required this.lastMessageTime,
     required this.readStatus,
     required this.aliases,
     required this.shareProfile,
+    this.lastSenderId,
   });
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'itemId': itemId,
+      'itemTitle': itemTitle,
       'participants': participants,
       'lastMessage': lastMessage,
       'lastMessageTime': Timestamp.fromDate(lastMessageTime),
       'readStatus': readStatus,
       'aliases': aliases,
       'shareProfile': shareProfile,
+      'lastSenderId': lastSenderId,
     };
   }
 
@@ -79,6 +85,7 @@ class Chat {
     return Chat(
       id: map['id'] ?? '',
       itemId: map['itemId'] ?? '',
+      itemTitle: map['itemTitle'] ?? '',
       participants: List<String>.from(map['participants'] ?? []),
       lastMessage: map['lastMessage'] ?? '',
       lastMessageTime:
@@ -86,6 +93,7 @@ class Chat {
       readStatus: Map<String, bool>.from(map['readStatus'] ?? {}),
       aliases: Map<String, String>.from(map['aliases'] ?? {}),
       shareProfile: Map<String, bool>.from(map['shareProfile'] ?? {}),
+      lastSenderId: map['lastSenderId'],
     );
   }
 }
@@ -130,16 +138,28 @@ class FirebaseChatService {
       participants.sort();
       final uidA = participants[0];
       final uidB = participants[1];
-      final aliases = {uidA: 'User A', uidB: 'User B'};
+      final aliases = {uidA: 'Anonymous User', uidB: 'Anonymous User'};
       final shareProfile = {currentId: false, otherUserId: false};
+
+      // Fetch item title for denormalization
+      String itemTitle = '';
+      try {
+        final itemDoc = await _firestore.collection('items').doc(itemId).get();
+        if (itemDoc.exists) {
+          final data = itemDoc.data() as Map<String, dynamic>;
+          itemTitle = (data['title'] as String?) ?? '';
+        }
+      } catch (_) {}
       final chatData = {
         'itemId': itemId,
+        'itemTitle': itemTitle,
         'participants': [_currentUserId!, otherUserId],
         'lastMessage': 'Chat started',
         'lastMessageTime': FieldValue.serverTimestamp(),
         'readStatus': {_currentUserId!: true, otherUserId: false},
         'aliases': aliases,
         'shareProfile': shareProfile,
+        'lastSenderId': _currentUserId!,
         'createdAt': FieldValue.serverTimestamp(),
       };
 
@@ -208,6 +228,7 @@ class FirebaseChatService {
         'lastMessage': content,
         'lastMessageTime': FieldValue.serverTimestamp(),
         'readStatus': readStatus,
+        'lastSenderId': _currentUserId,
       });
     } catch (e) {
       throw Exception('Failed to send message: $e');
@@ -238,15 +259,27 @@ class FirebaseChatService {
 
     return _chatsCollection
         .where('participants', arrayContains: _currentUserId!)
-        .orderBy('lastMessageTime', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs.map((doc) {
+          final chats = snapshot.docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
             data['id'] = doc.id;
             return Chat.fromMap(data);
           }).toList();
+          chats.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+          return chats;
         });
+  }
+
+  // Stream incoming info requests for current user
+  Stream<int> getPendingInfoRequestCount() {
+    if (_currentUserId == null) return Stream.value(0);
+    return _firestore
+        .collectionGroup('requests')
+        .where('to', isEqualTo: _currentUserId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((s) => s.size);
   }
 
   // Mark chat as read

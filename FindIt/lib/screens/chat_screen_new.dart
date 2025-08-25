@@ -275,6 +275,10 @@ class _ChatCard extends StatelessWidget {
       (participant) => participant != currentUserId,
       orElse: () => 'Unknown User',
     );
+    // If ids are used as participants, show Anonymous
+    if (otherParticipant.length > 20) {
+      return 'Anonymous User';
+    }
     return otherParticipant;
   }
 
@@ -376,7 +380,7 @@ class _ChatCard extends StatelessWidget {
 
                       // Item title
                       Text(
-                        'Item: ${chat.itemId}',
+                        chat.itemTitle.isNotEmpty ? chat.itemTitle : 'Item',
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.blue.shade600,
