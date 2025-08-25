@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/item.dart';
+import '../services/firebase_chat_service.dart';
+import '../services/firebase_auth_service.dart';
+import 'chat_detail_screen.dart';
 
 class ItemDetailsScreen extends StatefulWidget {
   final Item item;
@@ -12,6 +15,8 @@ class ItemDetailsScreen extends StatefulWidget {
 
 class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
   bool _isContacting = false;
+  final FirebaseChatService _chatService = FirebaseChatService();
+  final FirebaseAuthService _authService = FirebaseAuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -361,19 +366,52 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     setState(() => _isContacting = true);
 
     try {
-      // Simulate network delay
-      await Future.delayed(const Duration(seconds: 1));
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Opening chat with ${widget.item.isFound ? 'finder' : 'owner'}...',
+      final currentUser = _authService.currentUser;
+      if (currentUser == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please sign in to start a chat'),
+              backgroundColor: Colors.red,
             ),
-            backgroundColor: Colors.green,
-          ),
-        );
+          );
+        }
+        return;
       }
+
+      if (currentUser.uid == widget.item.userId) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("You can't chat with yourself"),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      final chatId = await _chatService.createOrGetChat(
+        itemId: widget.item.id,
+        otherUserId: widget.item.userId,
+      );
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatDetailScreen(
+            conversation: {
+              'chatId': chatId,
+              'itemId': widget.item.id,
+              'participants': [currentUser.uid, widget.item.userId],
+              'lastMessage': '',
+              'lastMessageTime': DateTime.now(),
+              'readStatus': {currentUser.uid: true, widget.item.userId: false},
+            },
+          ),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isContacting = false);

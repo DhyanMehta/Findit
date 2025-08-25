@@ -48,6 +48,8 @@ class Chat {
   final String lastMessage;
   final DateTime lastMessageTime;
   final Map<String, bool> readStatus; // userId -> hasRead
+  final Map<String, String> aliases; // userId -> alias (e.g., User A/B)
+  final Map<String, bool> shareProfile; // userId -> has shared real profile
 
   Chat({
     required this.id,
@@ -56,6 +58,8 @@ class Chat {
     required this.lastMessage,
     required this.lastMessageTime,
     required this.readStatus,
+    required this.aliases,
+    required this.shareProfile,
   });
 
   Map<String, dynamic> toMap() {
@@ -66,6 +70,8 @@ class Chat {
       'lastMessage': lastMessage,
       'lastMessageTime': Timestamp.fromDate(lastMessageTime),
       'readStatus': readStatus,
+      'aliases': aliases,
+      'shareProfile': shareProfile,
     };
   }
 
@@ -78,6 +84,8 @@ class Chat {
       lastMessageTime:
           (map['lastMessageTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
       readStatus: Map<String, bool>.from(map['readStatus'] ?? {}),
+      aliases: Map<String, String>.from(map['aliases'] ?? {}),
+      shareProfile: Map<String, bool>.from(map['shareProfile'] ?? {}),
     );
   }
 }
@@ -117,12 +125,21 @@ class FirebaseChatService {
       }
 
       // Create new chat
+      final currentId = _currentUserId!;
+      final participants = [currentId, otherUserId];
+      participants.sort();
+      final uidA = participants[0];
+      final uidB = participants[1];
+      final aliases = {uidA: 'User A', uidB: 'User B'};
+      final shareProfile = {currentId: false, otherUserId: false};
       final chatData = {
         'itemId': itemId,
         'participants': [_currentUserId!, otherUserId],
         'lastMessage': 'Chat started',
         'lastMessageTime': FieldValue.serverTimestamp(),
         'readStatus': {_currentUserId!: true, otherUserId: false},
+        'aliases': aliases,
+        'shareProfile': shareProfile,
         'createdAt': FieldValue.serverTimestamp(),
       };
 
@@ -144,17 +161,31 @@ class FirebaseChatService {
         throw Exception('User must be logged in to send messages');
       }
 
-      // Get current user info
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_currentUserId!)
-          .get();
+      // Determine display name based on chat anonymity settings
+      final chatDoc = await _chatsCollection.doc(chatId).get();
+      if (!chatDoc.exists) {
+        throw Exception('Chat not found');
+      }
+      final chatData = chatDoc.data() as Map<String, dynamic>;
+      final aliases = Map<String, String>.from(chatData['aliases'] ?? {});
+      final shareProfile = Map<String, bool>.from(
+        chatData['shareProfile'] ?? {},
+      );
 
-      final userName = userDoc.data()?['name'] ?? 'Unknown User';
+      String displayName;
+      if (shareProfile[_currentUserId] == true) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(_currentUserId!)
+            .get();
+        displayName = userDoc.data()?['name'] ?? 'User';
+      } else {
+        displayName = aliases[_currentUserId] ?? 'User';
+      }
 
       final messageData = {
         'senderId': _currentUserId!,
-        'senderName': userName,
+        'senderName': displayName,
         'content': content,
         'timestamp': FieldValue.serverTimestamp(),
         'type': type,
@@ -167,22 +198,17 @@ class FirebaseChatService {
           .add(messageData);
 
       // Update chat with last message info
-      final chatDoc = await _chatsCollection.doc(chatId).get();
-      if (chatDoc.exists) {
-        final chatData = chatDoc.data() as Map<String, dynamic>;
-        final participants = List<String>.from(chatData['participants']);
-
-        Map<String, bool> readStatus = {};
-        for (String participant in participants) {
-          readStatus[participant] = participant == _currentUserId;
-        }
-
-        await _chatsCollection.doc(chatId).update({
-          'lastMessage': content,
-          'lastMessageTime': FieldValue.serverTimestamp(),
-          'readStatus': readStatus,
-        });
+      final participants = List<String>.from(chatData['participants'] ?? []);
+      Map<String, bool> readStatus = {};
+      for (String participant in participants) {
+        readStatus[participant] = participant == _currentUserId;
       }
+
+      await _chatsCollection.doc(chatId).update({
+        'lastMessage': content,
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'readStatus': readStatus,
+      });
     } catch (e) {
       throw Exception('Failed to send message: $e');
     }
@@ -280,6 +306,69 @@ class FirebaseChatService {
       await batch.commit();
     } catch (e) {
       throw Exception('Failed to delete chat: $e');
+    }
+  }
+
+  // Request to share profile with the other participant (name only for now)
+  Future<String> requestProfileShare({
+    required String chatId,
+    required String toUserId,
+    List<String> fields = const ['name'],
+  }) async {
+    if (_currentUserId == null) {
+      throw Exception('User must be logged in to request info');
+    }
+
+    final requestData = {
+      'type': 'profile_share',
+      'from': _currentUserId,
+      'to': toUserId,
+      'fields': fields,
+      'status': 'pending',
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    final doc = await _chatsCollection
+        .doc(chatId)
+        .collection('requests')
+        .add(requestData);
+    return doc.id;
+  }
+
+  // Respond to profile share request
+  Future<void> respondProfileShare({
+    required String chatId,
+    required String requestId,
+    required bool approve,
+  }) async {
+    if (_currentUserId == null) {
+      throw Exception('User must be logged in to respond');
+    }
+
+    final reqRef = _chatsCollection
+        .doc(chatId)
+        .collection('requests')
+        .doc(requestId);
+    final reqSnap = await reqRef.get();
+    if (!reqSnap.exists) {
+      throw Exception('Request not found');
+    }
+    final data = reqSnap.data() as Map<String, dynamic>;
+    final toUserId = data['to'] as String?;
+    if (toUserId != _currentUserId) {
+      throw Exception('Not authorized to respond to this request');
+    }
+
+    await reqRef.update({
+      'status': approve ? 'approved' : 'denied',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    if (approve) {
+      await _chatsCollection.doc(chatId).update({
+        'shareProfile.$_currentUserId': true,
+      });
     }
   }
 }

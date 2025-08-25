@@ -8,7 +8,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/post_item_screen.dart';
 import 'screens/map_screen.dart';
-import 'screens/chat_screen.dart';
+import 'screens/chat_screen_new.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/profile_screen.dart';
 

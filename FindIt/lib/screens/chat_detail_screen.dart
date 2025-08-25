@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../services/firebase_chat_service.dart';
+import '../services/firebase_auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final Map<String, dynamic> conversation;
@@ -11,107 +14,109 @@ class ChatDetailScreen extends StatefulWidget {
 
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
-  final List<Map<String, dynamic>> _messages = [];
-  final bool _isLoading = false;
+  final FirebaseChatService _chatService = FirebaseChatService();
+  final FirebaseAuthService _authService = FirebaseAuthService();
+  String? _chatId;
+  String? _itemId;
+  List<String> _participants = [];
+  Map<String, String> _aliases = {};
+  Map<String, bool> _shareProfile = {};
+  String _otherUserId = '';
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _initializeFromConversation();
   }
 
-  void _loadMessages() {
-    // Simulate loading messages
-    _messages.addAll([
-      {
-        'id': '1',
-        'text': 'Hi! I found your wallet near the cafeteria.',
-        'isMe': false,
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 5)),
-      },
-      {
-        'id': '2',
-        'text': 'Oh thank you so much! Can you describe it?',
-        'isMe': true,
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 4)),
-      },
-      {
-        'id': '3',
-        'text': 'It\'s a black leather wallet with a silver buckle.',
-        'isMe': false,
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 3)),
-      },
-      {
-        'id': '4',
-        'text': 'That\'s definitely mine! Where can I meet you?',
-        'isMe': true,
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 2)),
-      },
-      {
-        'id': '5',
-        'text': 'I can meet you at the library entrance in 10 minutes.',
-        'isMe': false,
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 1)),
-      },
-    ]);
+  void _initializeFromConversation() {
+    final convo = widget.conversation;
+    _chatId = convo['chatId'] ?? convo['id'];
+    _itemId = convo['itemId'];
+    if (convo['participants'] != null) {
+      _participants = List<String>.from(convo['participants']);
+    }
+
+    // Fetch chat metadata (aliases/shareProfile/participants) when available
+    if (_chatId != null) {
+      FirebaseFirestore.instance
+          .collection('chats')
+          .doc(_chatId)
+          .snapshots()
+          .listen((doc) {
+            if (!mounted || !doc.exists) return;
+            final data = doc.data() as Map<String, dynamic>;
+            setState(() {
+              _participants = List<String>.from(
+                data['participants'] ?? _participants,
+              );
+              _aliases = Map<String, String>.from(data['aliases'] ?? {});
+              _shareProfile = Map<String, bool>.from(
+                data['shareProfile'] ?? {},
+              );
+              final current = _authService.currentUser?.uid;
+              if (current != null) {
+                _otherUserId = _participants.firstWhere(
+                  (p) => p != current,
+                  orElse: () => '',
+                );
+              }
+            });
+          });
+    }
   }
 
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty) return;
-
-    setState(() {
-      _messages.add({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'text': _messageController.text.trim(),
-        'isMe': true,
-        'timestamp': DateTime.now(),
-      });
-    });
-
+    if (_chatId == null) return;
+    final content = _messageController.text.trim();
     _messageController.clear();
+    _chatService.sendMessage(chatId: _chatId!, content: content);
+  }
 
-    // Simulate reply after 1 second
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        setState(() {
-          _messages.add({
-            'id': DateTime.now().millisecondsSinceEpoch.toString(),
-            'text': 'Thanks! I\'ll see you there.',
-            'isMe': false,
-            'timestamp': DateTime.now(),
-          });
-        });
-      }
-    });
+  Future<void> _requestInfo() async {
+    if (_chatId == null || _otherUserId.isEmpty) return;
+    await _chatService.requestProfileShare(
+      chatId: _chatId!,
+      toUserId: _otherUserId,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Info request sent')));
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>>? _requestsStream() {
+    if (_chatId == null || _authService.currentUser == null) return null;
+    return FirebaseFirestore.instance
+        .collection('chats')
+        .doc(_chatId)
+        .collection('requests')
+        .where('to', isEqualTo: _authService.currentUser!.uid)
+        .where('status', isEqualTo: 'pending')
+        .snapshots();
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = _authService.currentUser?.uid ?? '';
+    final otherDisplayName = _shareProfile[_otherUserId] == true
+        ? 'User' // Real name will show per message when shared
+        : (_aliases[_otherUserId] ?? 'User');
     return Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
-            CircleAvatar(
-              backgroundImage: NetworkImage(widget.conversation['avatarUrl']),
-              radius: 18,
-            ),
+            const CircleAvatar(radius: 18, child: Icon(Icons.person)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.conversation['userName'],
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  Text(
-                    widget.conversation['unreadCount'] > 0 ? 'Online' : 'Offline',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: widget.conversation['unreadCount'] > 0
-                          ? Colors.green
-                          : Colors.grey,
-                    ),
+                  Text(otherDisplayName, style: const TextStyle(fontSize: 16)),
+                  const Text(
+                    'Anonymous chat',
+                    style: TextStyle(fontSize: 12, color: Colors.white70),
                   ),
                 ],
               ),
@@ -123,22 +128,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.call),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Call feature coming soon!')),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.video_call),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Video call feature coming soon!'),
-                ),
-              );
-            },
+            icon: const Icon(Icons.badge_outlined),
+            tooltip: 'Request info',
+            onPressed: _requestInfo,
           ),
         ],
       ),
@@ -165,7 +157,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.conversation['itemTitle'],
+                        _itemId ?? 'Item',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -195,16 +187,90 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
           ),
 
+          // Pending info requests banner for current user
+          if (_requestsStream() != null)
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _requestsStream(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                final req = snapshot.data!.docs.first;
+                return Container(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.privacy_tip, color: Colors.amber),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'The other user requested to view your name. Share?',
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          await _chatService.respondProfileShare(
+                            chatId: _chatId!,
+                            requestId: req.id,
+                            approve: false,
+                          );
+                        },
+                        child: const Text('Deny'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () async {
+                          await _chatService.respondProfileShare(
+                            chatId: _chatId!,
+                            requestId: req.id,
+                            approve: true,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Share'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
           // Messages
           Expanded(
-            child: _isLoading
+            child: _chatId == null
                 ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final message = _messages[index];
-                      return _buildMessageBubble(message);
+                : StreamBuilder<List<Message>>(
+                    stream: _chatService.getMessages(_chatId!),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final messages = snapshot.data ?? [];
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        reverse: true,
+                        itemCount: messages.length,
+                        itemBuilder: (context, index) {
+                          final message = messages[index];
+                          final isMe = message.senderId == currentUserId;
+                          return _buildMessageBubble(
+                            text: message.content,
+                            isMe: isMe,
+                            timestamp: message.timestamp,
+                          );
+                        },
+                      );
                     },
                   ),
           ),
@@ -224,21 +290,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
             child: Row(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.attach_file),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('File attachment coming soon!'),
-                      ),
-                    );
-                  },
-                ),
                 Expanded(
                   child: TextField(
                     controller: _messageController,
                     decoration: InputDecoration(
-                      hintText: 'Type a message...',
+                      hintText: 'Type a message... (anonymous until you share)',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25),
                         borderSide: BorderSide.none,
@@ -270,9 +326,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  Widget _buildMessageBubble(Map<String, dynamic> message) {
-    final isMe = message['isMe'] as bool;
-
+  Widget _buildMessageBubble({
+    required String text,
+    required bool isMe,
+    required DateTime timestamp,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -281,10 +339,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             : MainAxisAlignment.start,
         children: [
           if (!isMe) ...[
-            CircleAvatar(
-              backgroundImage: NetworkImage(widget.conversation['avatarUrl']),
-              radius: 16,
-            ),
+            const CircleAvatar(radius: 16, child: Icon(Icons.person)),
             const SizedBox(width: 8),
           ],
           Flexible(
@@ -305,7 +360,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    message['text'],
+                    text,
                     style: TextStyle(
                       color: isMe ? Colors.white : Colors.black87,
                       fontSize: 14,
@@ -313,7 +368,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _formatTimestamp(message['timestamp']),
+                    _formatTimestamp(timestamp),
                     style: TextStyle(
                       color: isMe ? Colors.white70 : Colors.grey.shade600,
                       fontSize: 11,
@@ -325,12 +380,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
           if (isMe) ...[
             const SizedBox(width: 8),
-            CircleAvatar(
-              backgroundImage: NetworkImage(
-                'https://randomuser.me/api/portraits/men/1.jpg',
-              ),
-              radius: 16,
-            ),
+            const CircleAvatar(radius: 16, child: Icon(Icons.person)),
           ],
         ],
       ),
