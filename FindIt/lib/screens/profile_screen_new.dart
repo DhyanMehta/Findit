@@ -6,6 +6,7 @@ import '../models/item.dart';
 import '../utils/error_handler.dart';
 import 'edit_profile_screen.dart';
 import 'item_details_screen.dart';
+import 'user_items_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -398,6 +399,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 lostItems.toString(),
                 Icons.help_outline,
                 Colors.red,
+                () => _navigateToUserItems('lost', 'My Lost Items'),
               ),
             ),
             const SizedBox(width: 16),
@@ -407,6 +409,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 foundItems.toString(),
                 Icons.check_circle_outline,
                 Colors.green,
+                () => _navigateToUserItems('found', 'My Found Items'),
               ),
             ),
           ],
@@ -420,31 +423,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String value,
     IconData icon,
     Color color,
+    VoidCallback onTap,
   ) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 32),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 12,
+                color: Colors.grey.shade400,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -648,6 +662,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _isLoading ? 'Signing Out...' : 'Sign Out',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
+      ),
+    );
+  }
+
+  void _navigateToUserItems(String itemType, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UserItemsScreen(itemType: itemType, title: title),
       ),
     );
   }

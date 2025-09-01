@@ -4,18 +4,28 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'providers/user_provider.dart';
+import 'providers/settings_provider.dart';
 import 'services/notification_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/post_item_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/chat_screen_new.dart';
-import 'screens/notifications_screen.dart';
+import 'screens/notifications_screen_new.dart';
 import 'screens/profile_screen.dart';
+import 'services/fcm_service.dart';
+import 'services/notification_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize FCM and notification services
+  final fcmService = FCMService();
+  final notificationManager = NotificationManager();
+  await fcmService.initialize();
+  await notificationManager.initialize();
+
   runApp(const FindItApp());
 }
 
@@ -25,7 +35,10 @@ class FindItApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => UserProvider())],
+      providers: [
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ],
       child: MaterialApp(
         title: 'FindIt - Lost & Found',
         debugShowCheckedModeBanner: false,
@@ -89,20 +102,57 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
-  static final List<Widget> _screens = [
-    const HomeScreen(),
-    const PostItemScreen(),
-    const MapScreen(),
-    const ChatScreen(),
-    const NotificationsScreen(),
-    const ProfileScreen(),
-  ];
+  final NotificationManager _notificationManager = NotificationManager();
 
   void _onItemTapped(int index) {
     print('Tab tapped: $index'); // Debug print
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  void _navigateToHome() {
+    setState(() {
+      _selectedIndex = 0; // Navigate to home tab
+    });
+  }
+
+  List<Widget> get _screens => [
+    const HomeScreen(),
+    const PostItemScreen(),
+    const MapScreen(),
+    const ChatScreen(),
+    NotificationsScreen(onBrowseItems: _navigateToHome),
+    const ProfileScreen(),
+  ];
+
+  List<BottomNavigationBarItem> _buildBottomNavigationBarItems() {
+    return [
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.home_outlined),
+        label: 'Home',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.add_circle_outline),
+        label: 'Post',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.map_outlined),
+        label: 'Map',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.chat_bubble_outline),
+        label: 'Chat',
+      ),
+      BottomNavigationBarItem(
+        icon: NotificationIcon(notificationManager: _notificationManager),
+        label: 'Alerts',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.person_outline),
+        label: 'Profile',
+      ),
+    ];
   }
 
   @override
@@ -112,29 +162,7 @@ class _MainNavigationState extends State<MainNavigation> {
       body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_outline),
-            label: 'Post',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.map_outlined), label: 'Map'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: 'Chat',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.notifications_none),
-            label: 'Alerts',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Profile',
-          ),
-        ],
+        items: _buildBottomNavigationBarItems(),
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         selectedFontSize: 12,
@@ -142,6 +170,52 @@ class _MainNavigationState extends State<MainNavigation> {
         selectedIconTheme: const IconThemeData(size: 24),
         unselectedIconTheme: const IconThemeData(size: 20),
       ),
+    );
+  }
+}
+
+class NotificationIcon extends StatelessWidget {
+  final NotificationManager notificationManager;
+
+  const NotificationIcon({super.key, required this.notificationManager});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: notificationManager.getUnreadCount(),
+      builder: (context, snapshot) {
+        final unreadCount = snapshot.data ?? 0;
+        return Stack(
+          children: [
+            const Icon(Icons.notifications_none),
+            if (unreadCount > 0)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Text(
+                    unreadCount > 9 ? '9+' : unreadCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

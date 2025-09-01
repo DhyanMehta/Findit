@@ -302,10 +302,14 @@ class FirebaseAuthService {
       final user = currentUser;
       if (user == null) throw Exception('No user signed in');
 
-      // Update Firebase Auth profile
-      if (name != null) {
-        await user.updateDisplayName(name);
-      }
+      print('DEBUG: Starting profile update for user: ${user.uid}');
+      print(
+        'DEBUG: Update data - name: $name, phone: $phone, avatarUrl: $avatarUrl',
+      );
+
+      // Skip Firebase Auth profile update to avoid PigeonUserInfo casting issue
+      // We'll store all profile data in Firestore instead
+      print('DEBUG: Skipping Firebase Auth update to avoid casting issues');
 
       // Update Firestore document using set with merge to handle non-existent documents
       Map<String, dynamic> updates = {
@@ -316,15 +320,53 @@ class FirebaseAuthService {
       if (phone != null) updates['phone'] = phone;
       if (avatarUrl != null) updates['avatarUrl'] = avatarUrl;
 
+      print('DEBUG: Firestore updates to be applied: $updates');
+
       // Use set with merge instead of update to handle cases where document doesn't exist
       await _firestore
           .collection('users')
           .doc(user.uid)
           .set(updates, SetOptions(merge: true));
 
-      print('Profile updated successfully in Firestore');
+      print('DEBUG: Profile updated successfully in Firestore');
+
+      // Force reload the Firebase Auth user to sync changes
+      try {
+        await user.reload();
+        print('DEBUG: Firebase Auth user reloaded successfully');
+      } catch (reloadError) {
+        print('DEBUG: Firebase Auth reload failed: $reloadError');
+      }
+
+      // Verify the update by reading the document
+      final docSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (docSnapshot.exists) {
+        final data = docSnapshot.data();
+        print('DEBUG: Verified updated document data: $data');
+
+        // Specifically check if phone was updated
+        if (phone != null) {
+          final savedPhone = data?['phone'];
+          print('DEBUG: Phone verification - sent: $phone, saved: $savedPhone');
+          if (savedPhone == phone) {
+            print('DEBUG: ✅ Phone number successfully saved to Firestore');
+          } else {
+            print('DEBUG: ❌ Phone number mismatch in Firestore');
+          }
+        }
+      } else {
+        print('DEBUG: WARNING - Document does not exist after update!');
+      }
     } catch (e) {
-      print('Error updating profile: $e');
+      print('DEBUG: Error updating profile: $e');
+      print('DEBUG: Error type: ${e.runtimeType}');
+      if (e is FirebaseException) {
+        print('DEBUG: Firebase error code: ${e.code}');
+        print('DEBUG: Firebase error message: ${e.message}');
+      }
       throw Exception('Failed to update profile: $e');
     }
   }

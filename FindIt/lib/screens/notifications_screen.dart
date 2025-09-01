@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/notification_manager.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -8,46 +10,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final List<Map<String, dynamic>> _notifications = [
-    {
-      'id': '1',
-      'title': 'Item Found!',
-      'message': 'Your lost wallet has been found near the cafeteria.',
-      'timestamp': DateTime.now().subtract(const Duration(minutes: 10)),
-      'type': 'found',
-      'isRead': false,
-      'itemTitle': 'Lost Wallet',
-      'action': 'View Details',
-    },
-    {
-      'id': '2',
-      'title': 'New Message',
-      'message': 'Bob Johnson sent you a message about your keys.',
-      'timestamp': DateTime.now().subtract(const Duration(minutes: 30)),
-      'type': 'message',
-      'isRead': false,
-      'itemTitle': 'Found Keys',
-      'action': 'Reply',
-    },
-    {
-      'id': '3',
-      'title': 'Item Posted',
-      'message': 'Your lost phone post has been published successfully.',
-      'timestamp': DateTime.now().subtract(const Duration(hours: 2)),
-      'type': 'posted',
-      'isRead': true,
-      'itemTitle': 'Lost Phone',
-      'action': 'View Post',
-    },
-    {
-      'id': '4',
-      'title': 'Location Update',
-      'message': 'Someone reported seeing your lost bag near the library.',
-      'timestamp': DateTime.now().subtract(const Duration(hours: 4)),
-      'type': 'location',
-      'isRead': false,
-      'itemTitle': 'Lost Bag',
-      'action': 'View Map',
+  final NotificationManager _notificationManager = NotificationManager();
     },
     {
       'id': '5',

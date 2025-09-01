@@ -7,6 +7,10 @@ import '../utils/error_handler.dart';
 import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
 import 'item_details_screen.dart';
+import 'privacy_settings_screen.dart';
+import 'notification_settings_screen.dart';
+import 'help_support_screen.dart';
+import 'profile_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -136,135 +140,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _privacySettings() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Privacy Settings'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SwitchListTile(
-              title: const Text('Profile Visibility'),
-              subtitle: const Text('Show your profile to other users'),
-              value: true,
-              onChanged: (value) {
-                // TODO: Implement profile visibility toggle
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Feature coming soon!')),
-                );
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Location Sharing'),
-              subtitle: const Text('Share location data with posts'),
-              value: true,
-              onChanged: (value) {
-                // TODO: Implement location sharing toggle
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Feature coming soon!')),
-                );
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Activity Status'),
-              subtitle: const Text('Show when you were last active'),
-              value: false,
-              onChanged: (value) {
-                // TODO: Implement activity status toggle
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Feature coming soon!')),
-                );
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const PrivacySettingsScreen()),
     );
   }
 
   void _notifications() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Notification Settings'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SwitchListTile(
-              title: const Text('Push Notifications'),
-              subtitle: const Text('Receive notifications for new matches'),
-              value: true,
-              onChanged: (value) {
-                // TODO: Implement push notifications toggle
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Feature coming soon!')),
-                );
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Email Notifications'),
-              subtitle: const Text('Get updates via email'),
-              value: false,
-              onChanged: (value) {
-                // TODO: Implement email notifications toggle
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Feature coming soon!')),
-                );
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Chat Messages'),
-              subtitle: const Text('Get notified about new messages'),
-              value: true,
-              onChanged: (value) {
-                // TODO: Implement chat notification toggle
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Feature coming soon!')),
-                );
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const NotificationSettingsScreen(),
       ),
     );
   }
 
   void _helpSupport() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Help & Support'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Need help? Contact us:'),
-            SizedBox(height: 16),
-            Text('Email: support@findit.com'),
-            Text('Phone: +1 (555) 123-4567'),
-            SizedBox(height: 16),
-            Text('Or visit our FAQ section in the app.'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const HelpSupportScreen()));
+  }
+
+  void _allSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const ProfileSettingsScreen()),
     );
   }
 
@@ -635,6 +532,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: Icons.help_outline,
               title: 'Help & Support',
               onTap: _helpSupport,
+            ),
+            const Divider(),
+            _buildSettingTile(
+              icon: Icons.settings,
+              title: 'All Settings',
+              onTap: _allSettings,
             ),
           ],
         ),
