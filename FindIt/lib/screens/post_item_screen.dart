@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../services/cloudinary_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import '../services/firebase_auth_service.dart';
@@ -198,6 +199,15 @@ class _PostItemScreenState extends State<PostItemScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Upload image to Cloudinary if selected
+      String imageUrlToSave = '';
+      if (_imageUrl != null && _imageUrl!.isNotEmpty) {
+        final file = File(_imageUrl!);
+        if (await file.exists()) {
+          imageUrlToSave = await CloudinaryService().uploadImage(file);
+        }
+      }
+
       // Parse coordinates if they were set by GPS
       double latitude = _selectedLatitude ?? 0.0;
       double longitude = _selectedLongitude ?? 0.0;
@@ -222,7 +232,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
         location: _locationController.text.trim(),
         dateTime: _dateTime ?? DateTime.now(),
         contactMethod: 'In-app chat',
-        imageUrl: _imageUrl ?? '',
+        imageUrl: imageUrlToSave,
         userId: currentUser.uid,
         isFound: _itemType == 'found',
         latitude: latitude,

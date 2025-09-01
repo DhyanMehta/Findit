@@ -404,4 +404,136 @@ class FirebaseChatService {
       });
     }
   }
+
+  // ---------------- CLAIM / HANDOVER WORKFLOW ----------------
+  // A claim lives under chats/{chatId}/claims
+  // Fields: requestedBy, to (finder), itemId, status(pending|scheduled|completed|denied|cancelled),
+  // handoverAt (Timestamp), handoverLocation (String), createdAt, updatedAt, completedAt
+
+  Future<String> requestItemClaim({
+    required String chatId,
+    required String toUserId,
+    required String itemId,
+  }) async {
+    if (_currentUserId == null) {
+      throw Exception('User must be logged in to request item');
+    }
+    final data = {
+      'requestedBy': _currentUserId,
+      'to': toUserId,
+      'itemId': itemId,
+      'status': 'pending',
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    final doc = await _chatsCollection
+        .doc(chatId)
+        .collection('claims')
+        .add(data);
+    return doc.id;
+  }
+
+  Future<void> approveItemClaim({
+    required String chatId,
+    required String claimId,
+    required DateTime handoverAt,
+    required String handoverLocation,
+  }) async {
+    if (_currentUserId == null) {
+      throw Exception('User must be logged in to approve');
+    }
+    final ref = _chatsCollection.doc(chatId).collection('claims').doc(claimId);
+    final snap = await ref.get();
+    if (!snap.exists) throw Exception('Claim not found');
+    final data = snap.data() as Map<String, dynamic>;
+    final toUserId = data['to'] as String?;
+    if (toUserId != _currentUserId) {
+      throw Exception('Only the recipient can approve this claim');
+    }
+    await ref.update({
+      'status': 'scheduled',
+      'handoverAt': Timestamp.fromDate(handoverAt),
+      'handoverLocation': handoverLocation,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> markClaimCollected({
+    required String chatId,
+    required String claimId,
+  }) async {
+    if (_currentUserId == null) {
+      throw Exception('User must be logged in');
+    }
+    final ref = _chatsCollection.doc(chatId).collection('claims').doc(claimId);
+    final snap = await ref.get();
+    if (!snap.exists) throw Exception('Claim not found');
+    final data = snap.data() as Map<String, dynamic>;
+    final requestedBy = data['requestedBy'] as String?;
+    if (requestedBy != _currentUserId) {
+      throw Exception('Only the requester can mark as collected');
+    }
+    await ref.update({
+      'status': 'completed',
+      'completedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    // Also mark related item as resolved
+    final itemId = (data['itemId'] as String?) ?? '';
+    if (itemId.isNotEmpty) {
+      try {
+        await _firestore.collection('items').doc(itemId).update({
+          'status': 'resolved',
+          'resolvedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {}
+    }
+  }
+
+  // Claims targeting current user (as recipient) and pending approval
+  Stream<QuerySnapshot<Map<String, dynamic>>> pendingClaimsForMe(
+    String chatId,
+  ) {
+    if (_currentUserId == null) {
+      return const Stream.empty();
+    }
+    return _chatsCollection
+        .doc(chatId)
+        .collection('claims')
+        .where('to', isEqualTo: _currentUserId)
+        .where('status', isEqualTo: 'pending')
+        .snapshots();
+  }
+
+  // Claims for current user as requester that are scheduled (awaiting collection)
+  Stream<List<Map<String, dynamic>>> myScheduledClaims() {
+    if (_currentUserId == null) return const Stream.empty();
+    return _firestore
+        .collectionGroup('claims')
+        .where('requestedBy', isEqualTo: _currentUserId)
+        .where('status', isEqualTo: 'scheduled')
+        .snapshots()
+        .map(
+          (s) => s.docs
+              .map(
+                (d) => {
+                  ...d.data(),
+                  'claimId': d.id,
+                  'chatId': d.reference.parent.parent?.id,
+                },
+              )
+              .toList(),
+        );
+  }
+
+  // Global count of completed claims (items returned)
+  Stream<int> completedClaimsCount() {
+    return _firestore
+        .collectionGroup('claims')
+        .where('status', isEqualTo: 'completed')
+        .snapshots()
+        .map((s) => s.size);
+  }
 }

@@ -22,6 +22,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Map<String, String> _aliases = {};
   Map<String, bool> _shareProfile = {};
   String _otherUserId = '';
+  String? _pendingClaimId;
 
   @override
   void initState() {
@@ -63,6 +64,20 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               }
             });
           });
+
+      FirebaseFirestore.instance
+          .collection('chats')
+          .doc(_chatId)
+          .collection('claims')
+          .where('to', isEqualTo: _authService.currentUser!.uid)
+          .where('status', isEqualTo: 'pending')
+          .snapshots()
+          .listen((s) {
+            if (!mounted) return;
+            setState(() {
+              _pendingClaimId = s.docs.isNotEmpty ? s.docs.first.id : null;
+            });
+          });
     }
   }
 
@@ -84,6 +99,98 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Info request sent')));
+  }
+
+  Future<void> _requestClaim() async {
+    if (_chatId == null || _otherUserId.isEmpty || _itemId == null) return;
+    await _chatService.requestItemClaim(
+      chatId: _chatId!,
+      toUserId: _otherUserId,
+      itemId: _itemId!,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Request sent to collect this item')),
+    );
+  }
+
+  Future<void> _approveClaimFlow() async {
+    if (_chatId == null || _pendingClaimId == null) return;
+    DateTime? selectedDateTime;
+    final controller = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Schedule handover'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Where will you give the item?',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 60)),
+                  );
+                  if (date == null) return;
+                  final time = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay.now(),
+                  );
+                  if (time == null) return;
+                  setState(() {
+                    selectedDateTime = DateTime(
+                      date.year,
+                      date.month,
+                      date.day,
+                      time.hour,
+                      time.minute,
+                    );
+                  });
+                },
+                icon: const Icon(Icons.schedule),
+                label: Text(
+                  selectedDateTime == null
+                      ? 'Pick date & time'
+                      : '${selectedDateTime!.toLocal()}'.split('.').first,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed:
+                  selectedDateTime == null || controller.text.trim().isEmpty
+                  ? null
+                  : () async {
+                      await _chatService.approveItemClaim(
+                        chatId: _chatId!,
+                        claimId: _pendingClaimId!,
+                        handoverAt: selectedDateTime!,
+                        handoverLocation: controller.text.trim(),
+                      );
+                      if (mounted) Navigator.pop(context);
+                    },
+              child: const Text('Approve'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>>? _requestsStream() {
@@ -127,6 +234,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.assignment_turned_in_outlined),
+            tooltip: 'Request to collect',
+            onPressed: _requestClaim,
+          ),
           IconButton(
             icon: const Icon(Icons.badge_outlined),
             tooltip: 'Request info',
@@ -244,6 +356,37 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                 );
               },
+            ),
+
+          // Pending claim approval banner for finder
+          if (_pendingClaimId != null)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.assignment, color: Colors.green),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'User requested to collect this item. Approve and schedule?',
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed: _approveClaimFlow,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Approve'),
+                  ),
+                ],
+              ),
             ),
 
           // Messages

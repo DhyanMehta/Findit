@@ -3,17 +3,26 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
+import '../firebase_options.dart';
 
 class FirebaseAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  // Provide serverClientId to ensure idToken is returned on Android
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: <String>['email'],
+    // From android/app/google-services.json -> oauth_client where client_type == 3
+    serverClientId:
+        '114286790353-6o8sma8gc3djajurk16roq39iq2njn63.apps.googleusercontent.com',
+  );
 
   // Initialize Firebase if not already initialized
   Future<void> _ensureInitialized() async {
     try {
       if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp();
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
       }
     } catch (e) {
       // Firebase is already initialized
@@ -140,6 +149,12 @@ class FirebaseAuthService {
       // Obtain the auth details from the request
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
+
+      if (googleAuth.idToken == null) {
+        throw Exception(
+          'Google Sign-In failed to retrieve idToken. Ensure SHA-1 is added in Firebase and google-services.json is updated.',
+        );
+      }
 
       // Create a new credential
       final credential = GoogleAuthProvider.credential(

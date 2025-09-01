@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/item.dart';
 import '../services/firebase_chat_service.dart';
 import '../services/firebase_auth_service.dart';
@@ -47,22 +48,45 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Item Image
-              Container(
+              SizedBox(
                 height: 300,
                 width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(24),
-                    bottomRight: Radius.circular(24),
-                  ),
-                  image: DecorationImage(
-                    image: NetworkImage(widget.item.imageUrl),
-                    fit: BoxFit.cover,
-                  ),
-                ),
                 child: Stack(
                   children: [
-                    // Status Badge
+                    ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(24),
+                        bottomRight: Radius.circular(24),
+                      ),
+                      child: widget.item.imageUrl.isNotEmpty
+                          ? Image.network(
+                              widget.item.imageUrl,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorBuilder: (context, error, stack) =>
+                                  Container(
+                                    color: Colors.grey.shade200,
+                                    child: Icon(
+                                      widget.item.isFound
+                                          ? Icons.check_circle_outline
+                                          : Icons.help_outline,
+                                      color: Colors.grey,
+                                      size: 48,
+                                    ),
+                                  ),
+                            )
+                          : Container(
+                              color: Colors.grey.shade200,
+                              child: Icon(
+                                widget.item.isFound
+                                    ? Icons.check_circle_outline
+                                    : Icons.help_outline,
+                                color: Colors.grey,
+                                size: 48,
+                              ),
+                            ),
+                    ),
                     Positioned(
                       top: 16,
                       right: 16,
@@ -203,9 +227,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                               )
                             : const Icon(Icons.message),
                         label: Text(
-                          _isContacting
-                              ? 'Contacting...'
-                              : 'Contact ${widget.item.isFound ? 'Finder' : 'Owner'}',
+                          _isContacting ? 'Contacting...' : 'Contact Finder',
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
@@ -236,19 +258,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                           ),
                         ),
                         const SizedBox(width: 16),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _saveItem,
-                            icon: const Icon(Icons.bookmark_border),
-                            label: const Text('Save'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ),
-                        ),
+                        // Save button removed per requirements
                       ],
                     ),
                   ],
@@ -315,26 +325,36 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
           ),
           if (showMap) ...[
             const SizedBox(height: 16),
-            Container(
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.map, size: 32, color: Colors.grey.shade600),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Location: ${widget.item.latitude.toStringAsFixed(4)}, ${widget.item.longitude.toStringAsFixed(4)}',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12,
+            GestureDetector(
+              onTap: () {
+                _openMaps(
+                  widget.item.latitude,
+                  widget.item.longitude,
+                  widget.item.title,
+                );
+              },
+              child: Container(
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.map, size: 32, color: Colors.blue.shade600),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Open map at ${widget.item.latitude.toStringAsFixed(4)}, ${widget.item.longitude.toStringAsFixed(4)}',
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -342,6 +362,14 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _openMaps(double lat, double lng, String label) async {
+    final url = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+    final uri = Uri.parse(url);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
   }
 
   String _formatDateTime(DateTime dateTime) {
@@ -437,12 +465,5 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
     );
   }
 
-  void _saveItem() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Item saved to favorites'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
+  // Save feature removed
 }

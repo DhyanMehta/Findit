@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/firebase_auth_service.dart';
+import '../services/firebase_chat_service.dart';
 import '../services/firebase_item_service.dart';
 import '../models/user_model.dart';
 import '../models/item.dart';
@@ -383,35 +384,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildStatsSection() {
-    return StreamBuilder<List<Item>>(
-      stream: _itemService.getUserItems(_authService.currentUser!.uid),
-      builder: (context, snapshot) {
-        final items = snapshot.data ?? [];
-        final lostItems = items.where((item) => item.type == 'lost').length;
-        final foundItems = items.where((item) => item.type == 'found').length;
+    return Column(
+      children: [
+        StreamBuilder<List<Item>>(
+          stream: _itemService.getUserItems(_authService.currentUser!.uid),
+          builder: (context, snapshot) {
+            final items = snapshot.data ?? [];
+            final lostItems = items.where((item) => item.type == 'lost').length;
+            final foundItems = items
+                .where((item) => item.type == 'found')
+                .length;
 
-        return Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                'Lost Items',
-                lostItems.toString(),
-                Icons.help_outline,
-                Colors.red,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildStatCard(
-                'Found Items',
-                foundItems.toString(),
-                Icons.check_circle_outline,
-                Colors.green,
-              ),
-            ),
-          ],
-        );
-      },
+            return Row(
+              children: [
+                Expanded(
+                  child: _buildStatCard(
+                    'Lost Items',
+                    lostItems.toString(),
+                    Icons.help_outline,
+                    Colors.red,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildStatCard(
+                    'Found Items',
+                    foundItems.toString(),
+                    Icons.check_circle_outline,
+                    Colors.green,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        // Global dynamic count of items returned
+        StreamBuilder<int>(
+          stream: FirebaseChatService().completedClaimsCount(),
+          builder: (context, snapshot) {
+            final returned = snapshot.data ?? 0;
+            return _buildStatCard(
+              'Items Returned',
+              returned.toString(),
+              Icons.verified,
+              Colors.blue,
+            );
+          },
+        ),
+      ],
     );
   }
 
