@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/item.dart';
+import 'notification_manager.dart';
 
 class FirebaseItemService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final NotificationManager _notificationManager = NotificationManager();
 
   // Collection references
   CollectionReference get _itemsCollection => _firestore.collection('items');
@@ -25,6 +27,30 @@ class FirebaseItemService {
       itemData['updatedAt'] = FieldValue.serverTimestamp();
 
       final docRef = await _itemsCollection.add(itemData);
+
+      // Create item with the generated ID
+      final createdItem = Item(
+        id: docRef.id,
+        title: item.title,
+        description: item.description,
+        category: item.category,
+        imageUrl: item.imageUrl,
+        location: item.location,
+        dateTime: item.dateTime,
+        contactMethod: item.contactMethod,
+        isFound: item.isFound,
+        userId: _currentUserId!,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        status: item.status,
+        type: item.type,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      );
+
+      // Send notifications to other users
+      await _notificationManager.notifyNewItemPosted(createdItem);
+
       return docRef.id;
     } catch (e) {
       throw Exception('Failed to create item: $e');

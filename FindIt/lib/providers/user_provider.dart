@@ -52,16 +52,24 @@ class UserProvider with ChangeNotifier {
     _setError(null);
 
     try {
+      print('UserProvider: Starting profile update...');
+      print('UserProvider: name=$name, phone=$phone, avatarUrl=$avatarUrl');
+
       await _authService.updateUserProfile(
         name: name,
         phone: phone,
         avatarUrl: avatarUrl,
       );
 
+      print('UserProvider: Profile update service call completed');
+
       // Reload user data after update
       await loadUserData();
+      print('UserProvider: User data reloaded after update');
+
       return true;
     } catch (e) {
+      print('UserProvider: Error in updateProfile: $e');
       _setError('Failed to update profile: $e');
       return false;
     } finally {

@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io';
 import '../providers/user_provider.dart';
+import '../widgets/profile_avatar.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -127,22 +128,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _isLoading = true);
 
     try {
+      print('EditProfile: Starting profile update...');
+
       String? imageUrl = _uploadedImageUrl;
 
       // Upload new image if selected
       if (_selectedImage != null) {
+        print('EditProfile: Uploading new image...');
         final uploadedUrl = await _uploadImage();
         if (uploadedUrl != null) {
           imageUrl = uploadedUrl;
+          print('EditProfile: Image uploaded successfully: $imageUrl');
         }
       }
 
       final userProvider = context.read<UserProvider>();
+      print('EditProfile: Calling updateProfile with:');
+      print('EditProfile: name=${_nameController.text.trim()}');
+      print('EditProfile: phone=${_phoneController.text.trim()}');
+      print('EditProfile: avatarUrl=$imageUrl');
+
       final success = await userProvider.updateProfile(
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
         avatarUrl: imageUrl,
       );
+
+      print('EditProfile: Update result: $success');
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -152,8 +164,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
         );
         Navigator.pop(context);
+      } else if (mounted) {
+        // Show error from provider if available
+        final errorMessage =
+            userProvider.errorMessage ?? 'Unknown error occurred';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update profile: $errorMessage'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
+      print('EditProfile: Exception caught: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -163,7 +186,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -194,62 +219,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   // Profile Avatar Section
                   Center(
-                    child: GestureDetector(
+                    child: LargeProfileAvatar(
                       onTap: _selectImage,
-                      child: Stack(
-                        children: [
-                          Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.grey.shade200,
-                              image: _selectedImage != null
-                                  ? DecorationImage(
-                                      image: FileImage(_selectedImage!),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : (context.watch<UserProvider>().avatarUrl !=
-                                            null
-                                        ? DecorationImage(
-                                            image: NetworkImage(
-                                              context
-                                                  .watch<UserProvider>()
-                                                  .avatarUrl!,
-                                            ),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : null),
-                            ),
-                            child:
-                                _selectedImage == null &&
-                                    context.watch<UserProvider>().avatarUrl ==
-                                        null
-                                ? Icon(
-                                    Icons.person,
-                                    size: 60,
-                                    color: Colors.grey.shade400,
-                                  )
-                                : null,
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: Colors.blue,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.camera_alt,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                      imageUrl: _selectedImage != null
+                          ? null
+                          : context.watch<UserProvider>().avatarUrl,
+                      selectedImage: _selectedImage,
                     ),
                   ),
                   const SizedBox(height: 32),
